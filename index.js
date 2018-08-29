@@ -1,22 +1,28 @@
 'use strict';
 
+const L = require("winston");
+
 const path = require('path');
 require('dotenv').config({path: `${path.resolve(__dirname, "./.env")}`});
 
-const CronJob = require('cron').CronJob;
 const Koa = require("koa");
 const app = new Koa();
-const blacklist = require("./lib/blacklist");
-const L = require("winston");
 
+const cron = require("./lib/cron");
+cron.set();
 
-new CronJob('0 0 1 * * *', () => {
-    L.info("Downloading new blacklist DB.");
-    blacklist.run().then();
-}, null, true, 'Europe/Prague');
+const router = require("./lib/routes");
 
-app.use(async ctx => {
-    ctx.body = 'Hello World';
-});
+async function conditionalUpdate() {
+    const blacklist = require("./lib/blacklist");
+    if (await blacklist.count()) {
+        blacklist.update();
+    }
+}
 
-app.listen(3000);
+conditionalUpdate().then();
+
+L.info(`App listening on port ${process.env.APP_PORT}`);
+app
+    .use(router.routes())
+    .listen(process.env.APP_PORT);
